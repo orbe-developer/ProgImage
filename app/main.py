@@ -6,7 +6,7 @@ import uvicorn
 from .database import Image, pg_db as connection
 from .routers.images import router as image_router
 
-app = FastAPI(title='ProgImage', description=f'''ProgImage is a specialised service that offers image storage and retrieval. 
+app = FastAPI(title='ProgImage', description=f'''ProgImage is a specialized service that offers image storage and retrieval. 
                                                 \nIt also provides a number of image processing and transformation capabilities 
                                                 such as compression, rotation, a variety of filters, thumbnail creation, and masking.''',
               version='1')
