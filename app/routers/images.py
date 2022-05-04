@@ -13,7 +13,6 @@ router = APIRouter(prefix='/images')
 
 @router.post("")
 async def upload_file(file: UploadFile):
-    # try:
 
     if file.content_type not in ['image/jpg', 'image/jpeg', 'image/png']:
         raise HTTPException(
@@ -25,8 +24,6 @@ async def upload_file(file: UploadFile):
         image=image_bytes, content_type=file.content_type, description=file.filename)
 
     return image_created.id
-    # except ValueError as e:
-    # print(f'Error saving the image to the database: {e}')
 
 
 @router.get("/{image_id}", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
@@ -153,7 +150,6 @@ async def mask_image(files: list[UploadFile]):
 
     mask = Image_PIL.new("L", image1.size, 128)
     im = Image_PIL.composite(image1, image2, mask)
-    # im = Image_PIL.blend(image1, image2, 0.5)    
 
     masked_image = BytesIO()
     im.save(masked_image, img_ext)
@@ -255,19 +251,6 @@ async def mask_image_with_existing_image(files: list[UploadFile]):
 
 
 # ------------------------------Filters------------------------------
-
-""" def filter_image(function):
-    def wrapper(file):
-        if file.content_type not in ['image/jpg', 'image/jpeg', 'image/png']:
-            raise HTTPException(
-                status_code=406, detail="Only '.jpg', '.jpeg' or '.png' files allowed.")
-
-        function(file)
-
-        filtered_image = BytesIO()
-        original_image.save(filtered_image, "JPEG")
-        filtered_image.seek(0) """
-
 
 @router.post("/filter_blur", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
 async def blur_image(file: UploadFile):
@@ -436,7 +419,6 @@ async def gaussian_blur_image(file: UploadFile):
             status_code=406, detail="Only '.jpg', '.jpeg' or '.png' files allowed.")
 
     original_image = Image_PIL.open(file.file)
-    # original_image = original_image.filter(ImageFilter.GaussianBlur(radius=10))
     original_image = original_image.filter(ImageFilter.GaussianBlur)
 
     filtered_image = BytesIO()

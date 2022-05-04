@@ -1,8 +1,6 @@
 from fastapi import FastAPI
 from fastapi import APIRouter
 
-import uvicorn
-
 from .database import Image, pg_db as connection
 from .routers.images import router as image_router
 
@@ -15,7 +13,7 @@ api_v1 = APIRouter(prefix='/api/v1')
 
 api_v1.include_router(image_router)
 
-app.include_router(api_v1, prefix="/images", tags=["images"],)
+app.include_router(api_v1, prefix="/images", tags=["images"], )
 
 
 @app.on_event('startup')
@@ -38,4 +36,3 @@ def shutdown():
     # print('The server is shutting down.')
     if not connection.is_closed():
         connection.close()
-
