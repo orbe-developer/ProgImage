@@ -18,16 +18,10 @@ api_v1 = APIRouter(prefix='/api/v1')
 
 api_v1.include_router(image_router, prefix="", tags=["images"],)
 api_v1.include_router(image_processing, prefix="/images", tags=["image_processing"])
-# app.include_router(api_v1, prefix="", tags=["image_processing"])
-
 api_v1.include_router(image_filtering, prefix="/images", tags=["image_filtering"])
 api_v1.include_router(image_masking, prefix="/images", tags=["image_masking"])
+
 app.include_router(api_v1)
-
-
-
-# app.include_router(api_v1, prefix="/images/filtering", tags=["image_filtering"])
-# app.include_router(api_v1, prefix="/images/masking", tags=["image_masking"])
 
 
 @app.on_event('startup')
