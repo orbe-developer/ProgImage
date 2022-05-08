@@ -1,32 +1,28 @@
 from fastapi import APIRouter
-from fastapi import HTTPException, UploadFile, Form
+from fastapi import UploadFile, Form
 
 from fastapi.responses import Response, StreamingResponse
-
-from io import BytesIO
 
 from PIL import Image as Image_PIL
 
 from typing import Optional
 
+from app.routers.util import get_image_extension, save_image
+from app.routers.wrappers import verify_content_type, verify_dimensions
+
+
 router = APIRouter(prefix='/processing')
 
+
 @router.post("/compress_image", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
+@verify_content_type
+@verify_dimensions
 async def compress_image(file: UploadFile, width: int, height: int):
-    if file.content_type not in ['image/jpg', 'image/jpeg', 'image/png', ]:
-        raise HTTPException(
-            status_code=406, detail="Only '.jpg', '.jpeg' or '.png' files allowed.")
-
-    if width < 0 or height < 0:
-        raise HTTPException(
-            status_code=400, detail='width and height must be > 0')
-
-    original_image = Image_PIL.open(file.file)
-
     # get image extension
-    content_type = file.content_type
-    slash_index = content_type.find('/')
-    img_ext = content_type[slash_index + 1:] if slash_index != -1 else "JPEG"
+    img_ext = get_image_extension(file)
+
+    # open image
+    original_image = Image_PIL.open(file.file)
 
     # get dimensions
     if width == 0 and height == 0:
@@ -35,54 +31,42 @@ async def compress_image(file: UploadFile, width: int, height: int):
     # compress image
     original_image = original_image.resize(size=(width, height))
 
-    compressed_image = BytesIO()
-    original_image.save(compressed_image, img_ext)
+    # save image
+    compressed_image = save_image(original_image, img_ext)
+
     # original_image.save(compressed_image, img_ext, quality=95)
-    compressed_image.seek(0)
 
     return StreamingResponse(compressed_image, media_type=file.content_type)
 
 
 @router.post("/rotate_image", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
+@verify_content_type
 async def rotate_image(file: UploadFile, angle: int, expand: Optional[bool] = Form(None)):
-    if file.content_type not in ['image/jpg', 'image/jpeg', 'image/png']:
-        raise HTTPException(
-            status_code=406, detail="Only '.jpg', '.jpeg' or '.png' files allowed.")
 
     # get image extension
-    content_type = file.content_type
-    slash_index = content_type.find('/')
-    img_ext = content_type[slash_index + 1:] if slash_index != -1 else "JPEG"
+    img_ext = get_image_extension(file)
 
-    # open the image
+    # open image
     original_image = Image_PIL.open(file.file)
 
     # rotate image
     original_image = original_image.rotate(angle, expand=expand)
 
-    rotated_image = BytesIO()
-    original_image.save(rotated_image, img_ext)
-    rotated_image.seek(0)
+    # save image
+    rotated_image = save_image(original_image, img_ext)
 
     return StreamingResponse(rotated_image, media_type=file.content_type)
 
 
 @router.post("/thumbnail_image", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
+@verify_content_type
+@verify_dimensions
 async def make_thumbnail_of_image(file: UploadFile, width: int, height: int):
-    if file.content_type not in ['image/jpg', 'image/jpeg', 'image/png']:
-        raise HTTPException(
-            status_code=406, detail="Only '.jpg', '.jpeg' or '.png' files allowed.")
-
-    if width < 0 or height < 0:
-        raise HTTPException(
-            status_code=400, detail='width and height must be > 0')
 
     # get image extension
-    content_type = file.content_type
-    slash_index = content_type.find('/')
-    img_ext = content_type[slash_index + 1:] if slash_index != -1 else "JPEG"
+    img_ext = get_image_extension(file)
 
-    # open the image
+    # open image
     original_image = Image_PIL.open(file.file)
 
     # get dimensions
@@ -93,8 +77,7 @@ async def make_thumbnail_of_image(file: UploadFile, width: int, height: int):
     original_image.thumbnail((width, height))
     original_image.save(file.filename)
 
-    thumbnail_image = BytesIO()
-    original_image.save(thumbnail_image, img_ext)
-    thumbnail_image.seek(0)
+    # save image
+    thumbnail_image = save_image(original_image, img_ext)
 
     return StreamingResponse(thumbnail_image, media_type=file.content_type)
