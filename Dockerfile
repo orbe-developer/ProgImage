@@ -23,10 +23,12 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
-# Copy the application code and install the project itself
+# Copy the application code and install the project itself.
+# README.md is required because pyproject.toml declares it as the readme
+# field, which hatchling reads during the project install step.
 COPY app ./app
 COPY alembic ./alembic
-COPY alembic.ini ./
+COPY alembic.ini README.md ./
 RUN uv sync --frozen --no-dev
 
 
