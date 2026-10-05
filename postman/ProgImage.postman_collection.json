@@ -44,9 +44,17 @@
                 "type": "text/javascript",
                 "exec": [
                   "if (pm.response.code === 200) {",
-                  "  const body = pm.response.json();",
-                  "  pm.collectionVariables.set('token', body.access_token);",
-                  "  console.log('Token saved to collection variable.');",
+                  "  const token = pm.response.json().access_token;",
+                  "  // Set on the collection scope so the request works even",
+                  "  // without an environment selected.",
+                  "  pm.collectionVariables.set('token', token);",
+                  "  // Also set on the active environment (if any). Postman",
+                  "  // resolves variables environment > collection, so an empty",
+                  "  // env `token` would otherwise shadow the collection one.",
+                  "  if (pm.environment.name) {",
+                  "    pm.environment.set('token', token);",
+                  "  }",
+                  "  console.log('Token saved (' + (pm.environment.name ? 'environment + collection' : 'collection only') + ').');",
                   "} else {",
                   "  console.warn('Login failed:', pm.response.code, pm.response.text());",
                   "}"
@@ -91,9 +99,12 @@
                 "type": "text/javascript",
                 "exec": [
                   "if (pm.response.code === 201) {",
-                  "  const body = pm.response.json();",
-                  "  pm.collectionVariables.set('imageId', body.id);",
-                  "  console.log('imageId saved:', body.id);",
+                  "  const id = pm.response.json().id;",
+                  "  pm.collectionVariables.set('imageId', id);",
+                  "  if (pm.environment.name) {",
+                  "    pm.environment.set('imageId', id);",
+                  "  }",
+                  "  console.log('imageId saved:', id);",
                   "}"
                 ]
               }
