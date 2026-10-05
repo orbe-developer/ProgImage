@@ -1,9 +1,29 @@
+# IDE / editor
 /.idea/
-/.pytest_cache/
 /.vscode/
 
-/env/
+# Python caches
+/.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
 
-/app/__pycache__/
-app/routers/__pycache__/
-tests/__pycache__/
+# Virtual environments
+/env/
+/.venv/
+/venv/
+
+# uv (lockfile IS committed; only ignore local caches)
+/.uv-cache/
+
+# Environment and secrets
+.env
+.env.local
+
+# Build artefacts
+/dist/
+/build/
+*.egg-info/
+
+# OS
+.DS_Store
