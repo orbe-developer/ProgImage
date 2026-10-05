@@ -15,6 +15,10 @@ from app import models  # noqa: F401 — registers User, Image on Base.metadata
 from app.auth.router import router as auth_router
 from app.config import settings
 from app.database import Base, engine
+from app.routers.image_filtering import router as image_filtering_router
+from app.routers.image_masking import router as image_masking_router
+from app.routers.image_processing import router as image_processing_router
+from app.routers.images import router as images_router
 
 
 @asynccontextmanager
@@ -38,8 +42,9 @@ app = FastAPI(
 
 api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(auth_router, prefix="/auth", tags=["auth"])
-
-# Image routers are wired in Phase 7 once they are refactored to use the
-# async SQLAlchemy session and the current_user dependency.
+api_v1.include_router(images_router, tags=["images"])
+api_v1.include_router(image_processing_router, prefix="/images", tags=["image-processing"])
+api_v1.include_router(image_filtering_router, prefix="/images", tags=["image-filtering"])
+api_v1.include_router(image_masking_router, prefix="/images", tags=["image-masking"])
 
 app.include_router(api_v1)

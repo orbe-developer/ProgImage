@@ -1,227 +1,131 @@
-from fastapi import APIRouter
-from fastapi import UploadFile
-from fastapi.responses import Response, StreamingResponse
+"""Image filtering endpoints.
 
+Twelve filters share the same shape: validate content type, open the
+file with Pillow, apply the filter, stream the bytes back. A helper
+collapses the duplication while keeping each public endpoint explicit
+in OpenAPI.
+"""
+
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from PIL import ImageFilter, Image as Image_PIL
+from PIL.ImageFile import ImageFile
 
+from app.auth.dependencies import get_current_user
+from app.dependencies import ValidatedImage
+from app.models.user import User
 from app.routers.util import get_image_extension, save_image
-from app.routers.wrappers import verify_content_type
+from app.schemas import ErrorResponse
+
+router = APIRouter(prefix="/filtering")
+
+_FILTER_RESPONSES = {
+    200: {"content": {"image/png": {}, "image/jpeg": {}}},
+    401: {"model": ErrorResponse},
+    406: {"model": ErrorResponse},
+}
 
 
-router = APIRouter(prefix='/filtering')
-
-
-@router.post("/filter_blur", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def blur_image(file: UploadFile):
-    # get image extension
+def _apply(file, pil_filter: ImageFilter.Filter | type[ImageFilter.Filter]) -> StreamingResponse:
+    """Open the UploadFile, apply the given Pillow filter, stream result."""
     img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.BLUR)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_contour", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def contour_image(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.CONTOUR)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_detail", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def detail_image(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.DETAIL)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_edge_enhance", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def enhance_image_edges(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.EDGE_ENHANCE)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_edge_enhance_more", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def deeply_enhance_image_edges(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.EDGE_ENHANCE_MORE)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_emboss", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def emboss_image(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.EMBOSS)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_find_edges", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def find_image_edges(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.FIND_EDGES)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_smooth", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def smoth_image(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.SMOOTH)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_smooth_more", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def deeply_smoth_image(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.SMOOTH_MORE)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_sharpen", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def sharpen_image(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.SHARPEN)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_gaussian_blur", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def gaussian_blur_image(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.GaussianBlur)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
-
-
-@router.post("/filter_unsharp_mask", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_type
-async def unsharp_mask_image(file: UploadFile):
-    # get image extension
-    img_ext = get_image_extension(file)
-
-    # open image
-    original_image = Image_PIL.open(file.file)
-
-    # apply filter
-    original_image = original_image.filter(ImageFilter.UnsharpMask)
-
-    # save image
-    filtered_image = save_image(original_image, img_ext)
-
-    return StreamingResponse(filtered_image, media_type=file.content_type)
+    original: ImageFile = Image_PIL.open(file.file)
+    filtered = original.filter(pil_filter)
+    buffer = save_image(filtered, img_ext)
+    return StreamingResponse(buffer, media_type=file.content_type)
+
+
+@router.post("/filter_blur", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def blur_image(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.BLUR)
+
+
+@router.post("/filter_contour", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def contour_image(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.CONTOUR)
+
+
+@router.post("/filter_detail", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def detail_image(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.DETAIL)
+
+
+@router.post("/filter_edge_enhance", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def enhance_image_edges(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.EDGE_ENHANCE)
+
+
+@router.post("/filter_edge_enhance_more", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def deeply_enhance_image_edges(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.EDGE_ENHANCE_MORE)
+
+
+@router.post("/filter_emboss", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def emboss_image(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.EMBOSS)
+
+
+@router.post("/filter_find_edges", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def find_image_edges(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.FIND_EDGES)
+
+
+@router.post("/filter_smooth", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def smooth_image(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.SMOOTH)
+
+
+@router.post("/filter_smooth_more", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def deeply_smooth_image(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.SMOOTH_MORE)
+
+
+@router.post("/filter_sharpen", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def sharpen_image(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.SHARPEN)
+
+
+@router.post("/filter_gaussian_blur", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def gaussian_blur_image(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.GaussianBlur())
+
+
+@router.post("/filter_unsharp_mask", response_class=StreamingResponse, responses=_FILTER_RESPONSES)
+async def unsharp_mask_image(
+    file: ValidatedImage,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    return _apply(file, ImageFilter.UnsharpMask())

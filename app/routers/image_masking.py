@@ -1,109 +1,103 @@
-from fastapi import APIRouter
-from fastapi import HTTPException, UploadFile
-from fastapi.responses import Response, StreamingResponse
+"""Image masking endpoints: composite two images with various masks."""
 
-
-from io import BytesIO
-
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from PIL import ImageDraw, ImageFilter, Image as Image_PIL
 
+from app.auth.dependencies import get_current_user
+from app.dependencies import ValidatedImagePair, ValidatedImageTriplet
+from app.models.user import User
 from app.routers.util import get_image_extension, save_image
-from app.routers.wrappers import verify_content_types, verify_number_images
+from app.schemas import ErrorResponse
 
-router = APIRouter(prefix='/masking')
+router = APIRouter(prefix="/masking")
+
+_MASK_RESPONSES = {
+    200: {"content": {"image/png": {}, "image/jpeg": {}}},
+    400: {"model": ErrorResponse},
+    401: {"model": ErrorResponse},
+    406: {"model": ErrorResponse},
+}
 
 
-@router.post("/mask_image", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_types
-@verify_number_images
-async def mask_image(files: list[UploadFile]):
-
-    # get image extension
-    img_ext = get_image_extension(files[0])
-
-    # open image
+def _open_pair(files):
+    """Open the first file and resize the second to match the first's size."""
     image1 = Image_PIL.open(files[0].file)
     image2 = Image_PIL.open(files[1].file).resize(image1.size)
+    return image1, image2
 
-    # mask image
+
+@router.post(
+    "/mask_image",
+    response_class=StreamingResponse,
+    responses=_MASK_RESPONSES,
+)
+async def mask_image(
+    files: ValidatedImagePair,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """Blend two images using a flat 50 %-opacity mask."""
+    img_ext = get_image_extension(files[0])
+    image1, image2 = _open_pair(files)
     mask = Image_PIL.new("L", image1.size, 128)
-    im = Image_PIL.composite(image1, image2, mask)
-
-    # save image
-    masked_image = save_image(im, img_ext)
-
-    return StreamingResponse(masked_image, media_type=files[0].content_type)
+    composite = Image_PIL.composite(image1, image2, mask)
+    buffer = save_image(composite, img_ext)
+    return StreamingResponse(buffer, media_type=files[0].content_type)
 
 
-@router.post("/mask_image_drawing_circle", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_types
-@verify_number_images
-async def mask_image_by_drawing_circle(files: list[UploadFile]):
-
-    # get image extension
+@router.post(
+    "/mask_image_drawing_circle",
+    response_class=StreamingResponse,
+    responses=_MASK_RESPONSES,
+)
+async def mask_image_by_drawing_circle(
+    files: ValidatedImagePair,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """Composite two images through an ellipse cutout."""
     img_ext = get_image_extension(files[0])
-
-    # open image
-    image1 = Image_PIL.open(files[0].file)
-    image2 = Image_PIL.open(files[1].file).resize(image1.size)
-
-    # mask image
+    image1, image2 = _open_pair(files)
     mask = Image_PIL.new("L", image1.size, 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((140, 50, 260, 170), fill=255)
-    im = Image_PIL.composite(image1, image2, mask)
-
-    # save image
-    masked_image = save_image(im, img_ext)
-
-    return StreamingResponse(masked_image, media_type=files[0].content_type)
+    ImageDraw.Draw(mask).ellipse((140, 50, 260, 170), fill=255)
+    composite = Image_PIL.composite(image1, image2, mask)
+    buffer = save_image(composite, img_ext)
+    return StreamingResponse(buffer, media_type=files[0].content_type)
 
 
-@router.post("/mask_image_drawing_blur_circle", responses={200: {"content": {"image/png": {}}}},
-             response_class=Response)
-@verify_content_types
-@verify_number_images
-async def mask_image_by_drawing_blur_circle(files: list[UploadFile]):
-    # get image extension
+@router.post(
+    "/mask_image_drawing_blur_circle",
+    response_class=StreamingResponse,
+    responses=_MASK_RESPONSES,
+)
+async def mask_image_by_drawing_blur_circle(
+    files: ValidatedImagePair,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """Composite two images through a Gaussian-blurred ellipse."""
     img_ext = get_image_extension(files[0])
-
-    # open image
-    image1 = Image_PIL.open(files[0].file)
-    image2 = Image_PIL.open(files[1].file).resize(image1.size)
-
-    # mask image
+    image1, image2 = _open_pair(files)
     mask = Image_PIL.new("L", image1.size, 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((140, 50, 260, 170), fill=255)
-    im = Image_PIL.composite(image1, image2, mask)
-
-    mask_blur = mask.filter(ImageFilter.GaussianBlur(10))
-    im = Image_PIL.composite(image1, image2, mask_blur)
-
-    # save image
-    masked_image = save_image(im, img_ext)
-
-    return StreamingResponse(masked_image, media_type=files[0].content_type)
+    ImageDraw.Draw(mask).ellipse((140, 50, 260, 170), fill=255)
+    blurred_mask = mask.filter(ImageFilter.GaussianBlur(10))
+    composite = Image_PIL.composite(image1, image2, blurred_mask)
+    buffer = save_image(composite, img_ext)
+    return StreamingResponse(buffer, media_type=files[0].content_type)
 
 
-@router.post("/mask_image_existing_image", responses={200: {"content": {"image/png": {}}}}, response_class=Response)
-@verify_content_types
-async def mask_image_with_existing_image(files: list[UploadFile]):
-    if len(files) != 3:
-        raise HTTPException(
-            status_code=400, detail='You must send 3 images to mask.')
-
-    # get image extension
+@router.post(
+    "/mask_image_existing_image",
+    response_class=StreamingResponse,
+    responses=_MASK_RESPONSES,
+)
+async def mask_image_with_existing_image(
+    files: ValidatedImageTriplet,
+    _: User = Depends(get_current_user),
+) -> StreamingResponse:
+    """Composite two images through a mask image supplied by the client."""
     img_ext = get_image_extension(files[0])
-
-    # open image
     image1 = Image_PIL.open(files[0].file)
     image2 = Image_PIL.open(files[1].file).resize(image1.size)
-
-    mask = Image_PIL.open(files[2].file).convert('L').resize(image1.size)
-    im = Image_PIL.composite(image1, image2, mask)
-
-   # save image
-    masked_image = save_image(im, img_ext)
-
-    return StreamingResponse(masked_image, media_type=files[0].content_type)
+    mask = Image_PIL.open(files[2].file).convert("L").resize(image1.size)
+    composite = Image_PIL.composite(image1, image2, mask)
+    buffer = save_image(composite, img_ext)
+    return StreamingResponse(buffer, media_type=files[0].content_type)
