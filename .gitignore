@@ -27,3 +27,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Local study notes (committed on the `study-notes` branch, not on main)
+/docs/theory/
