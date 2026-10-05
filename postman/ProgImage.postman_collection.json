@@ -1,0 +1,273 @@
+{
+  "info": {
+    "name": "ProgImage",
+    "description": "Interactive API tests for the ProgImage service.\n\n## Flow\n1. **Auth > Register** creates a user.\n2. **Auth > Login** stores the returned JWT in the collection variable `token` (see Tests tab).\n3. Every other request inherits the collection-level Bearer auth and uses `{{token}}`.\n\n## Variables\n- `baseUrl`: default `http://localhost:8000/api/v1`.\n- `token`: populated automatically by Login.\n- `email` / `password`: used by Register and Login bodies.\n- `imageId`: set manually after Upload (or let a Tests script in Upload populate it).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000/api/v1", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "email", "value": "test@example.com", "type": "string" },
+    { "key": "password", "value": "longenoughpassword", "type": "string" },
+    { "key": "imageId", "value": "1", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "description": "Create a new user. Returns 201 with UserRead. 400 if email already exists. 422 if password < 8 chars or email malformed."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('token', body.access_token);",
+                  "  console.log('Token saved to collection variable.');",
+                  "} else {",
+                  "  console.warn('Login failed:', pm.response.code, pm.response.text());",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "username", "value": "{{email}}", "type": "text" },
+                { "key": "password", "value": "{{password}}", "type": "text" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "OAuth2 password flow. Returns 200 with { access_token, token_type }. The Tests tab auto-saves access_token to the `token` collection variable so subsequent requests work."
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] },
+            "description": "Return the currently authenticated user. Protected endpoint."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Images",
+      "item": [
+        {
+          "name": "Upload Image",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('imageId', body.id);",
+                  "  console.log('imageId saved:', body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": [], "description": "JPEG or PNG" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/images", "host": ["{{baseUrl}}"], "path": ["images"] },
+            "description": "Upload a new image. Returns 201 with ImageUploadResponse (id, content_type, description, created_at). 406 if content type is not image/jpeg|jpg|png. The Tests tab saves the returned id to the `imageId` collection variable."
+          }
+        },
+        {
+          "name": "Get Image By Id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/images/{{imageId}}", "host": ["{{baseUrl}}"], "path": ["images", "{{imageId}}"] },
+            "description": "Return raw image bytes. 404 if the image does not exist OR belongs to another user (owner-scoped access control; 404 instead of 403 avoids leaking foreign ids)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Processing",
+      "item": [
+        {
+          "name": "Compress Image",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": [] }]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/images/processing/compress_image?width=100&height=100",
+              "host": ["{{baseUrl}}"],
+              "path": ["images", "processing", "compress_image"],
+              "query": [
+                { "key": "width", "value": "100", "description": "Pydantic Field(ge=0, le=10000)" },
+                { "key": "height", "value": "100", "description": "Pydantic Field(ge=0, le=10000)" }
+              ]
+            },
+            "description": "Resize an image to the requested dimensions. Try width=-5 to see Pydantic's 422 validation error."
+          }
+        },
+        {
+          "name": "Rotate Image",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": [] }]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/images/processing/rotate_image?angle=90",
+              "host": ["{{baseUrl}}"],
+              "path": ["images", "processing", "rotate_image"],
+              "query": [
+                { "key": "angle", "value": "90", "description": "Degrees" },
+                { "key": "expand", "value": "true", "description": "Optional. Expand canvas to fit rotated content.", "disabled": true }
+              ]
+            },
+            "description": "Rotate the image by the given angle."
+          }
+        },
+        {
+          "name": "Thumbnail",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": [] }]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/images/processing/thumbnail_image?width=80&height=80",
+              "host": ["{{baseUrl}}"],
+              "path": ["images", "processing", "thumbnail_image"],
+              "query": [
+                { "key": "width", "value": "80" },
+                { "key": "height", "value": "80" }
+              ]
+            },
+            "description": "Produce a thumbnail bounded by the requested dimensions."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Filtering",
+      "item": [
+        { "name": "Blur",              "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_blur",              "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_blur"] } } },
+        { "name": "Contour",           "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_contour",           "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_contour"] } } },
+        { "name": "Detail",            "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_detail",            "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_detail"] } } },
+        { "name": "Edge Enhance",      "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_edge_enhance",      "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_edge_enhance"] } } },
+        { "name": "Edge Enhance More", "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_edge_enhance_more", "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_edge_enhance_more"] } } },
+        { "name": "Emboss",            "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_emboss",            "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_emboss"] } } },
+        { "name": "Find Edges",        "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_find_edges",        "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_find_edges"] } } },
+        { "name": "Smooth",            "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_smooth",            "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_smooth"] } } },
+        { "name": "Smooth More",       "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_smooth_more",       "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_smooth_more"] } } },
+        { "name": "Sharpen",           "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_sharpen",           "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_sharpen"] } } },
+        { "name": "Gaussian Blur",     "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_gaussian_blur",     "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_gaussian_blur"] } } },
+        { "name": "Unsharp Mask",      "request": { "method": "POST", "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": [] }] }, "url": { "raw": "{{baseUrl}}/images/filtering/filter_unsharp_mask",      "host": ["{{baseUrl}}"], "path": ["images","filtering","filter_unsharp_mask"] } } }
+      ]
+    },
+    {
+      "name": "Masking",
+      "item": [
+        {
+          "name": "Mask (flat 50%)",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": [], "description": "First image" },
+                { "key": "files", "type": "file", "src": [], "description": "Second image" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/images/masking/mask_image", "host": ["{{baseUrl}}"], "path": ["images","masking","mask_image"] },
+            "description": "Blend two images using a flat 50% mask. Must send exactly 2 files or receives 400."
+          }
+        },
+        {
+          "name": "Mask (drawing circle)",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": [] },
+                { "key": "files", "type": "file", "src": [] }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/images/masking/mask_image_drawing_circle", "host": ["{{baseUrl}}"], "path": ["images","masking","mask_image_drawing_circle"] },
+            "description": "Composite two images through an ellipse cutout."
+          }
+        },
+        {
+          "name": "Mask (drawing blur circle)",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": [] },
+                { "key": "files", "type": "file", "src": [] }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/images/masking/mask_image_drawing_blur_circle", "host": ["{{baseUrl}}"], "path": ["images","masking","mask_image_drawing_blur_circle"] },
+            "description": "Composite two images through a Gaussian-blurred ellipse."
+          }
+        },
+        {
+          "name": "Mask (existing image)",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": [], "description": "First image" },
+                { "key": "files", "type": "file", "src": [], "description": "Second image" },
+                { "key": "files", "type": "file", "src": [], "description": "Mask image (converted to grayscale)" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/images/masking/mask_image_existing_image", "host": ["{{baseUrl}}"], "path": ["images","masking","mask_image_existing_image"] },
+            "description": "Composite two images through a client-supplied mask image. Must send exactly 3 files or receives 400."
+          }
+        }
+      ]
+    }
+  ]
+}
