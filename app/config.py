@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     db_name: str = "progimage"
 
     # --- JWT ---
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str = "change-me-in-production-with-a-strong-32-byte-secret"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
