@@ -2,8 +2,8 @@
 
 End-to-end runbook for verifying every piece of ProgImage works on a fresh checkout. Covers both deployment methods in order:
 
-1. **Method B — Docker Compose** (recommended first run; self-contained, no local Python state required besides `uv` for optional steps).
-2. **Method A — Local with `uv`** reusing the Compose Postgres (demonstrates that the app code is not coupled to Docker).
+1. **Method A — Docker Compose** (recommended first run; self-contained, no local Python state required besides `uv` for optional steps).
+2. **Method B — Local with `uv`** reusing the Compose Postgres (demonstrates that the app code is not coupled to Docker).
 
 Each step gives the exact command to run plus the expected result so you can compare line-by-line. Status codes come from a real walk-through — if you see anything different, jump to the [Troubleshooting](#troubleshooting) section.
 
@@ -19,7 +19,7 @@ Each step gives the exact command to run plus the expected result so you can com
 | Postman | 10+ | <https://www.postman.com/downloads/> |
 | `curl`, `python3` | any recent | preinstalled on macOS |
 
-> Only `docker` + `docker compose` are required to run Method B. `uv` is required for Method A and the test suite.
+> Only `docker` + `docker compose` are required to run Method A. `uv` is required for Method B and the test suite.
 
 ---
 
@@ -36,9 +36,9 @@ Each step gives the exact command to run plus the expected result so you can com
 
 ---
 
-## Method B — Docker Compose
+## Method A — Docker Compose
 
-### B1. Clean state check
+### A1. Clean state check
 
 ```bash
 cd /path/to/ProgImage
@@ -49,7 +49,7 @@ docker volume ls --filter name=progimage
 
 Both should return headers only. If anything shows up, run `docker compose down -v` first.
 
-### B2. Make sure the environment file exists
+### A2. Make sure the environment file exists
 
 ```bash
 ls -la .env || cp .env.example .env
@@ -58,7 +58,7 @@ cat .env
 
 Default values are good enough for local use (`DB_HOST=localhost`, `DB_PORT=5432`, `JWT_SECRET` is a dev placeholder — do not deploy with it).
 
-### B3. Build and start
+### A3. Build and start
 
 ```bash
 docker compose up -d --build
@@ -71,7 +71,7 @@ Container progimage-db-1    Healthy
 Container progimage-app-1   Started
 ```
 
-### B4. Verify the stack
+### A4. Verify the stack
 
 ```bash
 docker compose ps
@@ -85,7 +85,7 @@ Expected:
 - Logs end with `Application startup complete.` and `Uvicorn running on http://0.0.0.0:8000`.
 - `/docs` returns `HTTP 200`.
 
-### B5. Inspect the OpenAPI schema
+### A5. Inspect the OpenAPI schema
 
 ```bash
 curl -s http://localhost:8000/openapi.json \
@@ -94,7 +94,7 @@ curl -s http://localhost:8000/openapi.json \
 
 Expected: `Title: ProgImage v0.2.0`, `Paths: 24 endpoints`, and a schemas list that includes `ImageUploadResponse`, `UserCreate`, `UserRead`, `Token`, `ErrorResponse`. `ImageResizeParams` / `ImageRotationParams` deliberately do not appear — FastAPI inlines them as separate query parameters when the models are injected via `Depends()`.
 
-### B6. Import the Postman collection
+### A6. Import the Postman collection
 
 Open Postman and import both files:
 
@@ -105,7 +105,7 @@ In the environments dropdown (top right), select **"ProgImage — local"**.
 
 The collection has 5 folders (Auth, Images, Processing, Filtering, Masking) with 24 requests. The collection-level Authorization is Bearer `{{token}}`; Register and Login override to no-auth. The Login request's `Tests` script writes the returned `access_token` into both the collection and the active environment variable, so subsequent requests work without manual copy-paste.
 
-### B7. Auth flow (3 requests)
+### A7. Auth flow (3 requests)
 
 In Postman:
 
@@ -117,7 +117,7 @@ In Postman:
 
 Sanity check: temporarily switch the **Auth → Me** request's authorisation to "No Auth" and send → you should get `401 { "detail": "Not authenticated" }`. Switch back to "Inherit auth from parent".
 
-### B8. Images — upload and retrieve
+### A8. Images — upload and retrieve
 
 In Postman:
 
@@ -126,7 +126,7 @@ In Postman:
 | **Images → Upload Image** | Body (form-data) → `file` → select any JPEG or PNG from your disk | `201`, `ImageUploadResponse` with `id`, `content_type`, `description` (= filename), `created_at`. Console prints `imageId saved: 1`. |
 | **Images → Get Image By Id** | URL uses `{{imageId}}` auto-populated by the Upload Tests script | `200` with the raw image bytes. Postman renders a preview inline. |
 
-### B9. Access control — a second user cannot read
+### A9. Access control — a second user cannot read
 
 In Postman:
 
@@ -139,7 +139,7 @@ In Postman:
 3. **Images → Get Image By Id** (URL still points at `/images/1`, which belongs to the first user). Expected **`404 Not Found`** with `{"detail": "Image 1 not found"}`. **Not 403** — see [`docs/theory/13-access-control-patterns.md`](theory/13-access-control-patterns.md) if present on this branch for why.
 4. **Auth → Login** again as the original user, then **Images → Get Image By Id** → `200`.
 
-### B10. Pydantic validation — invalid query parameters
+### A10. Pydantic validation — invalid query parameters
 
 In Postman, open **Processing → Compress Image** and attach any image to `file`. Then change the `width` query parameter to:
 
@@ -151,7 +151,7 @@ In Postman, open **Processing → Compress Image** and attach any image to `file
 
 The validation runs **before** the endpoint body — the `_apply` helper on `app/routers/image_processing.py:46` is never invoked for the first two cases.
 
-### B11. Filtering (visual)
+### A11. Filtering (visual)
 
 In Postman, each of these takes one `file` upload and returns the transformed image inline:
 
@@ -161,7 +161,7 @@ In Postman, each of these takes one `file` upload and returns the transformed im
 
 All 12 filters share the `_apply(file, pil_filter)` helper in `app/routers/image_filtering.py` — the Phase 7 refactor collapsed duplication while keeping each endpoint explicit in OpenAPI.
 
-### B12. Masking (arity enforcement)
+### A12. Masking (arity enforcement)
 
 In Postman, open **Masking → Mask (flat 50%)**:
 
@@ -176,11 +176,11 @@ These dependencies live in `app/dependencies.py:34-62` (`validate_image_pair`, `
 
 ---
 
-## Method A — Local with `uv` (reusing Compose's Postgres)
+## Method B — Local with `uv` (reusing Compose's Postgres)
 
 The point of this method is to demonstrate the app is not Docker-coupled: the same code runs locally against the same database.
 
-### A1. Stop only the app container, keep the DB
+### B1. Stop only the app container, keep the DB
 
 ```bash
 docker compose stop app
@@ -189,7 +189,7 @@ docker compose ps
 
 Expected: `progimage-db-1` still `Up … (healthy)`; `progimage-app-1` is gone (or `exited`).
 
-### A2. Verify `.env` points at `localhost`
+### B2. Verify `.env` points at `localhost`
 
 ```bash
 grep DB_HOST .env
@@ -197,7 +197,7 @@ grep DB_HOST .env
 
 Expected: `DB_HOST=localhost`. The Compose DB publishes port `5432` on the host, so this resolves to the same Postgres the containerised app was using.
 
-### A3. Start uvicorn via uv (foreground)
+### B3. Start uvicorn via uv (foreground)
 
 ```bash
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -212,16 +212,16 @@ INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 
 Keep this terminal open. If you see a `VIRTUAL_ENV mismatch` warning, see [Troubleshooting](#troubleshooting-virtual_env-warning).
 
-### A4. Verify the API responds (Postman)
+### B4. Verify the API responds (Postman)
 
 In the **existing Postman tab** (same collection, same environment) — no changes needed:
 
 - **Auth → Login** → `200`
 - **Auth → Me** → `200`
 
-Users and images uploaded in Method B are still there (same DB).
+Users and images uploaded in Method A are still there (same DB).
 
-### A5. Run the full test suite in a second terminal
+### B5. Run the full test suite in a second terminal
 
 ```bash
 cd /path/to/ProgImage
