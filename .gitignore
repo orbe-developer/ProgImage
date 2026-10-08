@@ -8,6 +8,12 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Coverage artefacts
+.coverage
+.coverage.*
+/htmlcov/
+/coverage.xml
+
 # Virtual environments
 /env/
 /.venv/
