@@ -38,6 +38,7 @@ Start top-to-bottom if this is your first pass. The files are mostly independent
 ### Cross-cutting concerns
 
 13. [`13-access-control-patterns.md`](13-access-control-patterns.md) — AuthN vs AuthZ, owner-scoped reads, why 404 over 403, SQL-level enforcement
+14. [`14-pytest-coverage.md`](14-pytest-coverage.md) — code coverage with `pytest-cov`: statement vs branch coverage, reading reports, trade-offs vs mutation testing
 
 ## Conventions
 
